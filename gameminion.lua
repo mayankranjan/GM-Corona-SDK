@@ -39,13 +39,10 @@ local gameminion_mt = { __index = gameminion }	-- metatable
 -- HELPERS
 -------------------------------------------------
 
---local GM_URL = "dev-gameminion.herokuapp.com"
 local GM_URL = "api.gameminion.com"
-local MP_URL = "mp.gameminion.com"
 local GM_ACCESS_KEY = ""
 local GM_SECRET_KEY = ""
 local authToken = ""
-local cloudStorageBox = ""
 
 -------------------------------------------------
 -- IMPORTS
@@ -122,7 +119,7 @@ local function postGM(path, parameters, networkListener)
 
 	params.headers = headers
 
-	local url = "http://"..GM_URL
+	local url = "https://"..GM_URL
 
 	print("\n----------------")
 	print("-- POST Call ---")
@@ -131,7 +128,8 @@ local function postGM(path, parameters, networkListener)
 	print("Post Parameters: "..parameters)
 	print("----------------")
 
-	network.request(url.."/"..path, "POST", networkListener, params)
+	local hReq = url.."/"..path.."?"..parameters
+	network.request(hReq, "POST", networkListener, params)
 end
 
 local function getGM(path, parameters, networkListener)
@@ -147,7 +145,7 @@ local function getGM(path, parameters, networkListener)
 
 	params.headers = headers
 
-	local url = "http://"..GM_URL
+	local url = "https://"..GM_URL
 
 	print("\n----------------")
 	print("-- GET Call ---")
@@ -162,7 +160,8 @@ local function getGM(path, parameters, networkListener)
 	network.request(hReq, "GET", networkListener, params)
 end
 
-local function putGM(path, parameters, putData)
+
+local function putGM(path, parameters, putData, networkListener)
 	-- PUT call to GM
 
 	local params = {}
@@ -175,7 +174,7 @@ local function putGM(path, parameters, putData)
 
 	params.headers = headers
 
-	local url = "http://"..GM_URL
+	local url = "https://"..GM_URL
 
 	print("\n----------------")
 	print("-- PUT Call ---")
@@ -190,6 +189,35 @@ local function putGM(path, parameters, putData)
 	network.request(hReq, "PUT", networkListener, params)
 end
 
+local function putGM(path, parameters, networkListener)
+	-- PUT call to GM
+
+	local params = {}
+
+
+	local authHeader = createBasicAuthHeader(GM_ACCESS_KEY, GM_SECRET_KEY)
+
+	local headers = {}
+	headers["Authorization"] = authHeader
+
+	params.headers = headers
+
+	local url = "https://"..GM_URL
+
+	print("\n----------------")
+	print("-- PUT Call ---")
+	print("Put URL: "..url)
+	print("Put Path: "..path)
+	print("Put Parameters: "..parameters)
+	print("----------------")
+
+	local hReq = url.."/"..path.."?"..parameters
+
+	print("\nPut Request: "..hReq)
+	network.request(hReq, "PUT", networkListener, params)
+end
+
+
 local function deleteGM(path, parameters)
 	-- Delete call to GM
 
@@ -203,7 +231,7 @@ local function deleteGM(path, parameters)
 
 	params.headers = headers
 
-	local url = "http://"..GM_ACCESS_KEY..":"..GM_SECRET_KEY.."@"..GM_URL
+	local url = "https://"..GM_ACCESS_KEY..":"..GM_SECRET_KEY.."@"..GM_URL
 
 	print("\n----------------")
 	print("-- DELETE Call ---")
@@ -216,7 +244,6 @@ local function deleteGM(path, parameters)
 
 	print("\nDelete Request: "..hReq)
 	network.request(hReq, "DELETE", networkListener, params)
-
 end
 
 
@@ -234,8 +261,6 @@ function gameminion.init(accessKey, secretKey)	-- constructor
 		authToken = authToken,
 		accessKey = GM_ACCESS_KEY,
 		secretKey = GM_SECRET_KEY,
-		gameID = "4f6f1e456b789d0001000002",
-		cloudStorageBox = cloudStorageBox,
 		gameminion = gameminion
 	}
 	
@@ -261,15 +286,23 @@ function gameminion:loginAPI(username, password)
 
 	-- set AuthToken when it gets it
 	local function networkListener(event)
+		local response = json.decode(event.response)
 		if (event.isError) then
 			print("Network Error")
 			print("Error: "..event.response)
 			return false
 		else
-			self.authToken = json.decode(event.response).auth_token
-			print("User Logged In!")
-			print("Auth Token: "..self.authToken)
-			return true
+
+			if (response.auth_token) then
+				self.authToken = response.auth_token
+				print("User Logged In!")
+				print("Auth Token: "..self.authToken)
+				Runtime:dispatchEvent({name="LoggedIn"})
+				return true
+			else
+				print("Login Error: "..event.response)
+				Runtime:dispatchEvent({name="LoginError", errorMsg=response.errors[1]})
+			end
 		end
 	end
 
@@ -280,10 +313,35 @@ end
 
 -------------------------------------------------
 
+function gameminion:isLoggedIn()
+
+	if (self.authToken == "" ) then
+		print("GM: User not logged in!")
+		return false
+	else
+		print("GM: User is logged in!")
+		return true
+	end
+end
+
+-------------------------------------------------
+
+function gameminion:getAuthToken()
+	return self.authToken
+end
+
+-------------------------------------------------
+
+function gameminion:setAuthToken(authToken)
+	self.authToken = authToken
+end
+
+-------------------------------------------------
+
 function gameminion:getMyProfile()
 	local params = "auth_token="..self.authToken
 
-	local path = "users/my_profile.json"
+	local path = "my_profile.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -293,10 +351,47 @@ function gameminion:getMyProfile()
 			return false
 		else
 			print("User Profile: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="MyProfile", results=response})
 		end
 	end
 
 	getGM(path, params, networkListener)
+end
+
+
+function gameminion:updateMyProfile(userName,firstName,lastName,passWord,profilePicture,facebookID,facebookEnabled,facebookAccessToken,twitterEnabled,twitterEnabledToken,points)
+	local params = "auth_token="..self.authToken
+	
+	if userName ~= nil then params = params.."&username="..userName end
+	if firstName ~= nil then params = params.."&first_name="..firstName end
+	if lastName ~= nil then params = params.."&last_name="..lastName end
+	if passWord ~= nil then params = params.."&password="..passWord end
+	if profilePicture ~= nil then params = params.."&profile_picture="..profilePicture end
+	if facebookID ~= nil then params = params.."&facebook_id="..facebookID end
+	if facebookEnabled ~= nil then params = params.."&facebook_enabled="..facebookEnabled end
+	if facebookAccessToken ~= nil then params = params.."&facebook_access_token="..facebookAccessToken end
+	if twitterEnabled ~= nil then params = params.."&twitter_enabled="..twitterEnabled end
+	if twitterEnabledToken ~= nil then params = params.."&twitter_enabled_token="..twitterEnabledToken end
+	if points ~= nil then params = params.."&points="..points end
+
+	
+
+	local path = "my_profile.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("My Profile Updated: "..event.response)
+		end
+	end
+
+	putGM(path, params, networkListener)
+
 end
 
 -------------------------------------------------
@@ -319,7 +414,7 @@ function gameminion:registerDevice(deviceToken)
 	params = params.."&device_id="..deviceToken
 	params = params.."&platform="..platform
 
-	local path = "devices.xml"
+	local path = "devices.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -333,27 +428,6 @@ function gameminion:registerDevice(deviceToken)
 	end
 
 	postGM(path, params, networkListener)
-end
-
--------------------------------------------------
-
-function gameminion:getUserProfile(userid)
-	local params = "auth_token="..self.authToken
-
-	local path = "users/"..userid..".json"
-
-	-- set currentUser when it gets it
-	local  function networkListener(event)
-		if (event.isError) then
-			print("Network Error")
-			print("Error: "..event.response)
-			return false
-		else
-			print("User "..userid.." Profile: "..event.response)
-		end
-	end
-
-	getGM(path, params, networkListener)
 end
 
 -------------------------------------------------
@@ -384,12 +458,6 @@ function gameminion:registerUser(firstName, lastName, username, email, password)
 end
 
 -------------------------------------------------
-
-function gameminion:recoverPassword(emailAddress)
-
-end
-
--------------------------------------------------
 -- Leaderboards
 -------------------------------------------------
 
@@ -406,6 +474,8 @@ function gameminion:getLeaderboards()
 			return false
 		else
 			print("Leaderboards"..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Leaderboards", results=response})
 		end
 	end
 
@@ -414,10 +484,10 @@ end
 
 -------------------------------------------------
 
-function gameminion:getLeaderboard(leaderboard)
+function gameminion:getLeaderboardScores(leaderboard)
 	local params = "auth_token="..self.authToken
 
-	local path = "leaderboards/"..leaderboard..".json"
+	local path = "leaderboards/"..leaderboard.."/scores.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -427,6 +497,8 @@ function gameminion:getLeaderboard(leaderboard)
 			return false
 		else
 			print("Leaderboard Details: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Leaderboards", results=response})
 		end
 	end
 
@@ -457,7 +529,7 @@ end
 -- Achievements
 -------------------------------------------------
 
-function gameminion:getAchievements()
+function gameminion:getAllAchievements()
 	local params = "auth_token="..self.authToken
 
 	local path = "achievements.json"
@@ -470,6 +542,8 @@ function gameminion:getAchievements()
 			return false
 		else
 			print("Achievements: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Achievements", results=response})
 		end
 	end
 
@@ -478,10 +552,10 @@ end
 
 -------------------------------------------------
 
-function gameminion:getAchievement(achievement)
+function gameminion:getStatusOfAchievement(achievementID)
 	local params = "auth_token="..self.authToken
 
-	local path = "achievements/"..achievement..".json"
+	local path = "achievements/"..achievementID..".json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -491,7 +565,8 @@ function gameminion:getAchievement(achievement)
 			return false
 		else
 			print("Achievement: "..event.response)
-			return event.response
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Achievements", results=response})
 		end
 	end
 
@@ -500,10 +575,10 @@ end
 
 -------------------------------------------------
 
-function gameminion:getMyAchievements()
+function gameminion:getMyUnlockedAchievements(userID)
 	local params = "auth_token="..self.authToken
 
-	local path = "achievements/user/4ead491c5ceaa10001000015.json"
+	local path = "achievements/user/"..userID..".json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -512,8 +587,9 @@ function gameminion:getMyAchievements()
 			print("Error: "..event.response)
 			return false
 		else
-			local netResponse = {name="netResponse", target=event.response}
-			Runtime:dispatchEvent(netResponse)
+			print("Achievement: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Achievements", results=response})
 		end
 	end
 
@@ -522,10 +598,13 @@ end
 
 -------------------------------------------------
 
-function gameminion:unlockAchievement(achievement, progress)
+function gameminion:unlockAchievement(achievementID, progress)
 	local params = "auth_token="..self.authToken
+	if progress ~= nil then 
+		params = "&progress="..progress
+	end
 
-	local path = "achievements/unlock/"..achievement..".json"
+	local path = "achievements/unlock/"..achievementID..".json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -539,96 +618,6 @@ function gameminion:unlockAchievement(achievement, progress)
 	end
 
 	postGM(path, params, networkListener)
-end
-
--------------------------------------------------
--- Cloud Storage
--------------------------------------------------
-
-function gameminion:createCloudBox()
-	local params = "auth_token="..self.authToken
-
-	local path = "storages.xml"
-
-	-- set cloudStorageBox when it gets it
-	local  function networkListener(event)
-		if (event.isError) then
-			print("Network Error")
-			print("Error: "..event.response)
-			return false
-		else
-			print("Cloud Storage Box Created: "..event.response)
-			--self.cloudStorageBox = json.decode(event.response).auth_token
-			self.cloudStorageBox = event.response
-		end
-	end
-
-	postGM(path, params, networkListener)
-end
-
--------------------------------------------------
-
-function gameminion:networkSave(data, storageID)
-	local params = "auth_token="..self.authToken
-
-	local path = "storages.xml/"..storageID
-
-	-- set cloudStorageBox when it gets it
-	local  function networkListener(event)
-		if (event.isError) then
-			print("Network Error")
-			print("Error: "..event.response)
-			return false
-		else
-			print("Cloud Storage Box Updated: "..event.response)
-		end
-	end
-
-	putGM(path, params, networkListener)
-
-end
-
--------------------------------------------------
-
-function gameminion:networkLoad(storageID)
-	local params = "auth_token="..self.authToken
-
-	local path = "storages.xml/"..storageID
-
-	-- set currentUser when it gets it
-	local  function networkListener(event)
-		if (event.isError) then
-			print("Network Error")
-			print("Error: "..event.response)
-			return false
-		else
-			print("Cloud Storage: "..event.response)
-		end
-	end
-
-	getGM(path, params, networkListener)
-end
-
--------------------------------------------------
-
-function gameminion:getCloudStorage()
-	local params = "auth_token="..self.authToken
-
-	--local path = "storage/"..storageID
-	local path = "storages.xml"
-
-	-- set currentUser when it gets it
-	local  function networkListener(event)
-		if (event.isError) then
-			print("Network Error")
-			print("Error: "..event.response)
-			return false
-		else
-			print("Cloud Storage: "..event.response)
-		end
-	end
-
-	getGM(path, params, networkListener)
 end
 
 -------------------------------------------------
@@ -665,7 +654,7 @@ function gameminion:createChatRoom(chatRoomName)
 	local params = "auth_token="..self.authToken
 	params = params.."&name="..chatRoomName
 
-	local path = "chats.xml"
+	local path = "chats.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -684,11 +673,10 @@ end
 
 -------------------------------------------------
 
-
-function gameminion:getChatRooms()
+function gameminion:deleteChatRoom(chatroomID)
 	local params = "auth_token="..self.authToken
-
-	local path = "chats.xml"
+	
+	local path = "chats/"..chatroomID..".json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -697,33 +685,21 @@ function gameminion:getChatRooms()
 			print("Error: "..event.response)
 			return false
 		else
-			print("Chat Rooms: "..event.response)
+			print("Chat Room Deleted: "..event.response)
 		end
 	end
 
-	getGM(path, params, networkListener)
+	deleteGM(path, params, networkListener)
 
 end
 
 -------------------------------------------------
 
-function gameminion:joinChatRoom(chatroomID)
-
-end
-
--------------------------------------------------
-
-function gameminion:addUserToChat(userID, chatroomID)
-
-end
-
--------------------------------------------------
-
-function gameminion:sendChatMessage(chatroomID, message)
+function gameminion:sendMessageToChatRoom(chatroomID,message)
 	local params = "auth_token="..self.authToken
-	params = params.."&chat="..chatroomID
+	params = params.."&content="..message
 
-	local path = "chats.xml"
+	local path = "chats/"..chatroomID.."/send_message.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -732,7 +708,7 @@ function gameminion:sendChatMessage(chatroomID, message)
 			print("Error: "..event.response)
 			return false
 		else
-			print("Chat Message Sent: "..event.response)
+			print("Message Sent: "..event.response)
 		end
 	end
 
@@ -742,10 +718,80 @@ end
 
 -------------------------------------------------
 
+function gameminion:addUserToChatRoom(userID,chatroomID)
+	local params = "auth_token="..self.authToken
+	params = params.."&user_id="..userID
+
+	local path = "chats/"..chatroomID.."/add_user.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("User Added to Chat Room: "..event.response)
+		end
+	end
+
+	postGM(path, params, networkListener)
+
+end
+
+-------------------------------------------------
+
+function gameminion:removeUserFromChatRoom(userID,chatroomID)
+	local params = "auth_token="..self.authToken
+	params = params.."&user_id="..userID
+	
+	local path = "chats/"..chatroomID.."/remove_user.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("User Removed from Chat Room: "..event.response)
+		end
+	end
+
+	deleteGM(path, params, networkListener)
+
+end
+-------------------------------------------------
+
+--Returns all the chat room the user is in
+function gameminion:getChatRooms()
+	local params = "auth_token="..self.authToken
+
+	local path = "chats.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Chat Rooms: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Chat", results=response})
+		end
+	end
+
+	getGM(path, params, networkListener)
+
+end
+
+-------------------------------------------------
+
 function gameminion:getChatHistory(chatroomID)
 	local params = "auth_token="..self.authToken
 
-	local path = "chats/"..chatroomID..".xml"
+	local path = "chats/"..chatroomID.."/get_recent_chats.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -755,6 +801,8 @@ function gameminion:getChatHistory(chatroomID)
 			return false
 		else
 			print("Chat Room History: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Chat", results=response})
 		end
 	end
 
@@ -762,7 +810,7 @@ function gameminion:getChatHistory(chatroomID)
 end
 
 -------------------------------------------------
-
+--Return what users are currently in a chat room
 function gameminion:getUsersInChatRoom(chatroomID)
 	local params = "auth_token="..self.authToken
 
@@ -776,16 +824,12 @@ function gameminion:getUsersInChatRoom(chatroomID)
 			return false
 		else
 			print("Chat Room Members: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Chat", results=response})
 		end
 	end
 
 	getGM(path, params, networkListener)
-
-end
-
--------------------------------------------------
-
-function gameminion:leaveChatRoom(chatroom)
 
 end
 
@@ -805,19 +849,20 @@ function gameminion:getFriends()
 			print("Error: "..event.response)
 			return false
 		else
-			print("Friends: "..event.response)
+			print("Chat Rooms: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Friends", type="Friends", results=response})
 		end
 	end
 
 	getGM(path, params, networkListener)
-
 end
 
 -------------------------------------------------
 
-function gameminion:addFriend(user)
+function gameminion:addFriend(friendID)
 	local params = "auth_token="..self.authToken
-	params = params.."&friend_id="..user
+	params = params.."&user_id="..friendID
 
 	local path = "friends.json"
 
@@ -829,6 +874,8 @@ function gameminion:addFriend(user)
 			return false
 		else
 			print("Friend Added: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Friends", type="FriendAdded", results=response})
 		end
 	end
 
@@ -837,9 +884,9 @@ end
 
 -------------------------------------------------
 
-function gameminion:removeFriend(user)
+function gameminion:removeFriend(friendID)
 	local params = "auth_token="..self.authToken
-	params = params.."&friend_id="..user
+	params = params.."&user_id="..friendID
 
 	local path = "friends.json"
 
@@ -850,7 +897,9 @@ function gameminion:removeFriend(user)
 			print("Error: "..event.response)
 			return false
 		else
-			print("Friend Removed: "..event.response)
+			print("Friend Deleted: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Friends", type="FriendDeleted", results=response})
 		end
 	end
 
@@ -874,6 +923,8 @@ function gameminion:getNews()
 			return false
 		else
 			print("News: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="News", type="News", results=response})
 		end
 	end
 
@@ -895,6 +946,8 @@ function gameminion:getUnreadNews()
 			return false
 		else
 			print("News (Unread): "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="News", type="UnreadNews", results=response})
 		end
 	end
 
@@ -903,10 +956,10 @@ end
 
 -------------------------------------------------
 
-function gameminion:getNewsArticle(article)
+function gameminion:getNewsArticle(articleID)
 	local params = "auth_token="..self.authToken
 
-	local path = "news/"..article..".json"
+	local path = "news/"..articleID..".json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -916,6 +969,8 @@ function gameminion:getNewsArticle(article)
 			return false
 		else
 			print("News Article: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="News", type="NewsArticle", results=response})
 		end
 	end
 
@@ -929,7 +984,7 @@ end
 function gameminion:createMatch()
 	local params = "auth_token="..self.authToken
 	
-	local path = "games/"..self.gameID.."/matches.xml"
+	local path = "matches.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -939,6 +994,34 @@ function gameminion:createMatch()
 			return false
 		else
 			print("Match Created: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="MatchCreated", results=response})
+		end
+	end
+
+	postGM(path, params, networkListener)
+end
+
+-------------------------------------------------
+
+function gameminion:createMatchAndStart()
+	local params = "auth_token="..self.authToken
+	
+	local path = "matches.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Match Created and Started: "..event.response)
+			local response = json.decode(event.response)
+
+			-- Start match
+			self:startMatch(response._id)
+			Runtime:dispatchEvent({name="Multiplayer", type="MatchCreated", results=response})
 		end
 	end
 
@@ -948,11 +1031,12 @@ end
 -------------------------------------------------
 
 function gameminion:getMatches()
+	
 	local params = "auth_token="..self.authToken
 
-	local path = "games/"..self.gameID.."/matches.xml"
+	local path = "matches.json"
 
-	-- set currentUser when it gets it
+	-- dispatch matches event with list of matches
 	local  function networkListener(event)
 		if (event.isError) then
 			print("Network Error")
@@ -960,6 +1044,8 @@ function gameminion:getMatches()
 			return false
 		else
 			print("Get Matches: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="Matches", results=response})
 		end
 	end
 
@@ -971,7 +1057,7 @@ end
 function gameminion:getMatchDetails(matchID)
 	local params = "auth_token="..self.authToken
 
-	local path = "games/"..self.gameID.."/matches/"..matchID..".xml"
+	local path = "matches/"..matchID..".json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -981,6 +1067,8 @@ function gameminion:getMatchDetails(matchID)
 			return false
 		else
 			print("Get Match Details: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="MatchDetails", results=response})
 		end
 	end
 
@@ -990,6 +1078,24 @@ end
 -------------------------------------------------
 
 function gameminion:deleteMatch(matchID)
+	local params = "auth_token="..self.authToken
+
+	local path = "matches/"..matchID..".json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Match Deleted: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="MatchDeleted", results=response})
+		end
+	end
+
+	deleteGM(path, params, networkListener)
 
 end
 
@@ -999,7 +1105,7 @@ function gameminion:addPlayerToMatch(userID, matchID)
 	local params = "auth_token="..self.authToken
 	params = params.."&user_id="..userID
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/add_player.xml"
+	local path = "matches/"..matchID.."/add_player.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1017,12 +1123,37 @@ end
 
 -------------------------------------------------
 
+function gameminion:deletePlayer(matchID,playerID)
+	local params = "auth_token="..self.authToken
+	params = params.."&player_id="..playerID
+
+	local path = "matches/"..matchID.."/remove_player.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Player Removed: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="PlayerDeleted", results=response})
+		end
+	end
+
+	deleteGM(path, params, networkListener)
+
+end
+
+-------------------------------------------------
+
 function gameminion:addPlayerToMatchGroup(userID, groupID, matchID)
 	local params = "auth_token="..self.authToken
 	params = params.."&user_id="..userID
 	params = params.."&group_id="..groupID
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/add_player_to_group.xml"
+	local path = "matches/"..matchID.."/add_player_to_group.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1040,27 +1171,8 @@ end
 
 -------------------------------------------------
 
-function gameminion:removePlayerFromMatch(userID, matchID)
-
-end
-
--------------------------------------------------
-
-function gameminion:createMatchGroup(groupName, matchID)
-
-end
-
--------------------------------------------------
-
-function gameminion:deleteMatchGroup(groupID, matchID)
-
-end
-
--------------------------------------------------
-
 function gameminion:submitMove(moveContent, targetGroup, targetUser, matchID)
 	local params = "auth_token="..self.authToken
-	params = params.."&content="..moveContent
 	
 	-- if targetgroup specified then add parameter
 	if (targetGroup ~= nil) then
@@ -1071,8 +1183,13 @@ function gameminion:submitMove(moveContent, targetGroup, targetUser, matchID)
 	if (targetGroup ~= nil) then
 		params = params.."&target_user_id="..targetUser
 	end
+
+	-- Base64 encode moveContent
+	moveContent = b64enc(moveContent)
+
+	params = params.."&content="..moveContent
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/move.xml"
+	local path = "matches/"..matchID.."/move.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1090,10 +1207,18 @@ end
 
 -------------------------------------------------
 
-function gameminion:getRecentMoves(matchID)
+function gameminion:getRecentMoves(matchID, limit)
 	local params = "auth_token="..self.authToken
 
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/get_recent_moves.xml"
+	local path = "matches/"..matchID.."/get_recent_moves.json"
+
+	-- Force get all moves
+	params = params.."&criteria=all"
+
+	-- Check if limit provided, if so add param
+	if (limit ~= nil) then
+		params = params.."&move_count="..limit
+	end
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1103,28 +1228,17 @@ function gameminion:getRecentMoves(matchID)
 			return false
 		else
 			print("Recent Match Moves: "..event.response)
-		end
-	end
+			local response = json.decode(event.response)
 
-	getGM(path, params, networkListener)
-end
+			-- Decode content - Convenient!
+			-- TODO: Need to made it iterate through all moves,
+			-- not just one.
+			if (response[1] ~= nil) then
+				print("Decoding Content")
+				response[1].content = b64dec(response[1].content)
+			end
 
--------------------------------------------------
-
-function gameminion:getAllMoves(matchID)
-	local params = "auth_token="..self.authToken
-	params = params.."&criteria=all"
-
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/get_recent_moves.xml"
-
-	-- set currentUser when it gets it
-	local  function networkListener(event)
-		if (event.isError) then
-			print("Network Error")
-			print("Error: "..event.response)
-			return false
-		else
-			print("All Match Moves: "..event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="RecentMoves", results=response})
 		end
 	end
 
@@ -1136,7 +1250,7 @@ end
 function gameminion:startMatch(matchID)
 	local params = "auth_token="..self.authToken
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/start.xml"
+	local path = "matches/"..matchID.."/start.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1146,6 +1260,7 @@ function gameminion:startMatch(matchID)
 			return false
 		else
 			print("Match Started: "..event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="MatchStarted"})
 		end
 	end
 
@@ -1157,7 +1272,7 @@ end
 function gameminion:stopMatch(matchID)
 	local params = "auth_token="..self.authToken
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/stop.xml"
+	local path = "matches/"..matchID.."/stop.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1167,6 +1282,8 @@ function gameminion:stopMatch(matchID)
 			return false
 		else
 			print("Match Stopped: "..event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="MatchStopped"})
+
 		end
 	end
 
@@ -1178,7 +1295,7 @@ end
 function gameminion:acceptChallenge(matchID)
 	local params = "auth_token="..self.authToken
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/accept_request.xml"
+	local path = "matches/"..matchID.."/accept_request.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1199,7 +1316,7 @@ end
 function gameminion:declineChallenge(matchID)
 	local params = "auth_token="..self.authToken
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/reject_request.xml"
+	local path = "matches/"..matchID.."/reject_request.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1217,10 +1334,14 @@ end
 
 -------------------------------------------------
 
-function gameminion:createRandomChallenge(matchID)
+function gameminion:createRandomChallenge(matchID,matchType)
 	local params = "auth_token="..self.authToken
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/random_match_up.xml"
+	if matchType ~= nil then 
+		params = params.."&match_type="..matchType
+	end
+
+	local path = "matches/random_match_up.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1230,6 +1351,7 @@ function gameminion:createRandomChallenge(matchID)
 			return false
 		else
 			print("Random Challenge Sent: "..event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="RandomChallenge", results=response})
 		end
 	end
 
@@ -1241,7 +1363,7 @@ end
 function gameminion:createMPChannel(matchID)
 	local params = "auth_token="..self.authToken
 	
-	local path = "games/"..self.gameID.."/matches/"..matchID.."/create_channel_for_player.xml"
+	local path = "matches/"..matchID.."/create_channel_for_player.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -1260,7 +1382,7 @@ end
 -------------------------------------------------
 
 function gameminion:pollMP(playerID)
-	local path = "http://"..MP_URL.."/receive"
+	local path = "http://mp.gameminion.com/receive"
 	path = path.."?player_id="..playerID
 
 	-- set currentUser when it gets it
@@ -1271,6 +1393,8 @@ function gameminion:pollMP(playerID)
 			return false
 		else
 			print("Connecting to MP Server: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="Receive", results=response})
 		end
 	end
 

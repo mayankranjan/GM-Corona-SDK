@@ -17,7 +17,7 @@ local json = require("json")
 
 -- initialize Game Minion
 -- Make sure you use your own games keys!
-gm = gm.init("00a23d5a344b9021481d207b676ecfb1c2a7459f", "5aad1eb3922a796897b51c79f0b1865170690259")
+gm = gm.init("bc1a9793a0a85ae9bca657dcb48faa90f73689fe", "d0731e1dabdfcf60336098ff75f3913230f2db89")
 
 
 -- create new user account or login existing
@@ -51,7 +51,7 @@ Runtime:addEventListener("netResponse", netResListener)
 
 
 local function gmCallListener()
-	--gm:getMyProfile()
+	gm:getMyProfile()
 	--gm:getUserProfile("4ead491c5ceaa10001000015")
 	--gm:addFriend("4f0be09cc8c1950001000001")
 	--gm:getFriends()
@@ -103,10 +103,10 @@ local function mpCallListener()
 	for i=1, 100 do
 		--local content = "move "..i
 		--gm:submitMove(content, nil, nil, "4f7309d702b79f000100000b")
-		analyticsEvent.value = i
-		gm:submitEvent(analyticsEvent)
+		--analyticsEvent.value = i
+		--gm:submitEvent(analyticsEvent)
 	end
 	--gm:acceptChallenge("4f71b41173860c0001000001")
 
 end
-timer.performWithDelay(10000, mpCallListener)
+--timer.performWithDelay(10000, mpCallListener)
