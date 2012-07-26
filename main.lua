@@ -37,9 +37,7 @@ local function listenerLogin(event)
 
         --gm:getMyProfile()
         gm:getLeaderboards()
-        --gm:getStorageBox()
-        --gm:createStorageBox()
-        --gm:updateStorageBox(data)
+
 end
 
 local function listenerMyProfile(event)
@@ -70,14 +68,6 @@ local function listenerLeaderboards(event)
         end
 end
 
-local function listenerStorage(event)
-        if (event.errorMsg ~= nil) then         
-        	print( "Error Message: "..event.errorMsg)
-        end
-        --gm:getStorageBox()
-        --gm:createStorageBox()
-        --gm:updateStorageBox(data)
-end
 
 --Here are event listeners that will call the method "listenerLogin" when the response is received
 --Please review the gameminion.lua to see the event names that are returned
@@ -85,4 +75,3 @@ Runtime:addEventListener( "LoggedIn", listenerLogin )
 Runtime:addEventListener( "LoginError", listenerLogin )
 Runtime:addEventListener( "MyProfile", listenerMyProfile )
 Runtime:addEventListener( "Leaderboards", listenerLeaderboards )
---Runtime:addEventListener( "CloudStorage", listenerStorage)
