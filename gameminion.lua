@@ -43,6 +43,7 @@ local GM_URL = "api.gameminion.com"
 local GM_ACCESS_KEY = ""
 local GM_SECRET_KEY = ""
 local authToken = ""
+local cloudStorageBox = ""
 
 -------------------------------------------------
 -- IMPORTS
@@ -129,6 +130,7 @@ local function postGM(path, parameters, networkListener)
 	print("----------------")
 
 	local hReq = url.."/"..path.."?"..parameters
+	print("\nPost Request: "..hReq)
 	network.request(hReq, "POST", networkListener, params)
 end
 
@@ -173,6 +175,7 @@ local function putGM(path, parameters, putData, networkListener)
 	headers["Authorization"] = authHeader
 
 	params.headers = headers
+	params.body = putData --MH
 
 	local url = "https://"..GM_URL
 
@@ -201,6 +204,7 @@ local function putGM(path, parameters, networkListener)
 	headers["Authorization"] = authHeader
 
 	params.headers = headers
+	params.body = putData --MH
 
 	local url = "https://"..GM_URL
 
@@ -261,6 +265,7 @@ function gameminion.init(accessKey, secretKey)	-- constructor
 		authToken = authToken,
 		accessKey = GM_ACCESS_KEY,
 		secretKey = GM_SECRET_KEY,
+		cloudStorageBox = cloudStorageBox,
 		gameminion = gameminion
 	}
 	
@@ -360,7 +365,7 @@ function gameminion:getMyProfile()
 end
 
 
-function gameminion:updateMyProfile(userName,firstName,lastName,passWord,profilePicture,facebookID,facebookEnabled,facebookAccessToken,twitterEnabled,twitterEnabledToken,points)
+function gameminion:updateMyProfile(userName,firstName,lastName,passWord,profilePicture,facebookID,facebookEnabled,facebookAccessToken,twitterEnabled,twitterEnabledToken)
 	local params = "auth_token="..self.authToken
 	
 	if userName ~= nil then params = params.."&username="..userName end
@@ -373,10 +378,7 @@ function gameminion:updateMyProfile(userName,firstName,lastName,passWord,profile
 	if facebookAccessToken ~= nil then params = params.."&facebook_access_token="..facebookAccessToken end
 	if twitterEnabled ~= nil then params = params.."&twitter_enabled="..twitterEnabled end
 	if twitterEnabledToken ~= nil then params = params.."&twitter_enabled_token="..twitterEnabledToken end
-	if points ~= nil then params = params.."&points="..points end
-
 	
-
 	local path = "my_profile.json"
 
 	-- set currentUser when it gets it
@@ -475,7 +477,7 @@ function gameminion:getLeaderboards()
 		else
 			print("Leaderboards"..event.response)
 			local response = json.decode(event.response)
-			Runtime:dispatchEvent({name="Leaderboards", results=response})
+			Runtime:dispatchEvent({name="Leaderboards", type="AllLeaderboards", results=response})
 		end
 	end
 
@@ -498,7 +500,7 @@ function gameminion:getLeaderboardScores(leaderboard)
 		else
 			print("Leaderboard Details: "..event.response)
 			local response = json.decode(event.response)
-			Runtime:dispatchEvent({name="Leaderboards", results=response})
+			Runtime:dispatchEvent({name="Leaderboards", type="GetScores",results=response})
 		end
 	end
 
@@ -508,8 +510,9 @@ end
 -------------------------------------------------
 function gameminion:submitHighScore(leaderboard, score)
 	local params = "auth_token="..self.authToken
+	params = params.."&value="..score
 
-	local path = "leaderboards/"..leaderboard.."/scores.json".."?value="..score
+	local path = "leaderboards/"..leaderboard.."/scores.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
@@ -519,6 +522,7 @@ function gameminion:submitHighScore(leaderboard, score)
 			return false
 		else
 			print("Leaderboard Details: "..event.response)
+			Runtime:dispatchEvent({name="Leaderboards", type="ScoreSubmitted"})
 		end
 	end
 
@@ -543,7 +547,7 @@ function gameminion:getAllAchievements()
 		else
 			print("Achievements: "..event.response)
 			local response = json.decode(event.response)
-			Runtime:dispatchEvent({name="Achievements", results=response})
+			Runtime:dispatchEvent({name="Achievements", type="AllAchievements", results=response})
 		end
 	end
 
@@ -566,7 +570,7 @@ function gameminion:getStatusOfAchievement(achievementID)
 		else
 			print("Achievement: "..event.response)
 			local response = json.decode(event.response)
-			Runtime:dispatchEvent({name="Achievements", results=response})
+			Runtime:dispatchEvent({name="Achievements", type="AchievementStatus", results=response})
 		end
 	end
 
@@ -589,7 +593,7 @@ function gameminion:getMyUnlockedAchievements(userID)
 		else
 			print("Achievement: "..event.response)
 			local response = json.decode(event.response)
-			Runtime:dispatchEvent({name="Achievements", results=response})
+			Runtime:dispatchEvent({name="Achievements", type="UnlockedAchievements", results=response})
 		end
 	end
 
@@ -601,7 +605,7 @@ end
 function gameminion:unlockAchievement(achievementID, progress)
 	local params = "auth_token="..self.authToken
 	if progress ~= nil then 
-		params = "&progress="..progress
+		params = param.."&progress="..progress
 	end
 
 	local path = "achievements/unlock/"..achievementID..".json"
@@ -614,6 +618,7 @@ function gameminion:unlockAchievement(achievementID, progress)
 			return false
 		else
 			print("Achievement Unlocked: "..event.response)
+			Runtime:dispatchEvent({name="Achievements", type="AchievementUnlocked"})
 		end
 	end
 
@@ -976,6 +981,78 @@ function gameminion:getNewsArticle(articleID)
 
 	getGM(path, params, networkListener)
 end
+
+-------------------------------------------------
+-- Cloud Storage
+-------------------------------------------------
+
+function gameminion:createStorageBox()
+	local params = "auth_token="..self.authToken
+
+	local path = "storage.json"
+
+	-- set cloudStorageBox when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Cloud Storage Box Created: "..event.response)
+			self.cloudStorageBox = event.response
+			Runtime:dispatchEvent({name="CloudStorage", type="CloudStorageBoxCreated", results=response})
+		end
+	end
+
+	postGM(path, params, networkListener)
+end
+
+-------------------------------------------------
+
+function gameminion:updateStorageBox(data)
+	local params = "auth_token="..self.authToken
+
+	local path = "storage.json"
+
+	-- set cloudStorageBox when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Cloud Storage Box Updated: "..event.response)
+			Runtime:dispatchEvent({name="CloudStorage", type="CloudStorageBoxUpdated", results=response})
+		end
+	end
+
+	putGM(path, params, data, networkListener)
+
+end
+
+-------------------------------------------------
+
+function gameminion:getStorageBox()
+	local params = "auth_token="..self.authToken
+
+	local path = "storage.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Retrieve Cloud Storage: "..event.response)
+			Runtime:dispatchEvent({name="CloudStorage", type="CloudStorageBoxRetrieved", results=response})
+		end
+	end
+
+	getGM(path, params, networkListener)
+end
+
+
 
 -------------------------------------------------
 -- Multiplayer
