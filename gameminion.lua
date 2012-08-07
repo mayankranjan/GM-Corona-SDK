@@ -129,7 +129,7 @@ local function postGM(path, parameters, networkListener)
 	print("Post Parameters: "..parameters)
 	print("----------------")
 
-	local hReq = url.."/"..path.."?"..parameters
+	local hReq = url.."/"..path
 	print("\nPost Request: "..hReq)
 	network.request(hReq, "POST", networkListener, params)
 end
