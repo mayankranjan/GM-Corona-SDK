@@ -1178,6 +1178,30 @@ end
 
 -------------------------------------------------
 
+function gameminion:resignMatch(matchID)
+	local params = "auth_token="..self.authToken
+
+	local path = "matches/"..matchID.."/resign.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Match Resigned: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="Multiplayer", type="MatchResigned", results=response})
+		end
+	end
+
+	deleteGM(path, params, networkListener)
+
+end
+
+-------------------------------------------------
+
 function gameminion:addPlayerToMatch(userID, matchID)
 	local params = "auth_token="..self.authToken
 	params = params.."&user_id="..userID
