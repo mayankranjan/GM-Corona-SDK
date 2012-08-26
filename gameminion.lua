@@ -222,7 +222,7 @@ local function putGM(path, parameters, networkListener)
 end
 
 
-local function deleteGM(path, parameters)
+local function deleteGM(path, parameters, networkListener)
 	-- Delete call to GM
 
 	local params = {}
@@ -235,7 +235,7 @@ local function deleteGM(path, parameters)
 
 	params.headers = headers
 
-	local url = "https://"..GM_ACCESS_KEY..":"..GM_SECRET_KEY.."@"..GM_URL
+	local url = "https://"..GM_URL
 
 	print("\n----------------")
 	print("-- DELETE Call ---")
