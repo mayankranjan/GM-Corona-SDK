@@ -43,7 +43,6 @@ local GM_URL = "api.gameminion.com"
 local GM_ACCESS_KEY = ""
 local GM_SECRET_KEY = ""
 local authToken = ""
-local cloudStorageBox = ""
 
 -------------------------------------------------
 -- IMPORTS
@@ -162,36 +161,6 @@ local function getGM(path, parameters, networkListener)
 	network.request(hReq, "GET", networkListener, params)
 end
 
-
-local function putGM(path, parameters, putData, networkListener)
-	-- PUT call to GM
-
-	local params = {}
-
-
-	local authHeader = createBasicAuthHeader(GM_ACCESS_KEY, GM_SECRET_KEY)
-
-	local headers = {}
-	headers["Authorization"] = authHeader
-
-	params.headers = headers
-	params.body = putData --MH
-
-	local url = "https://"..GM_URL
-
-	print("\n----------------")
-	print("-- PUT Call ---")
-	print("Put URL: "..url)
-	print("Put Path: "..path)
-	print("Put Parameters: "..parameters)
-	print("----------------")
-
-	local hReq = url.."/"..path.."?"..parameters
-
-	print("\nPut Request: "..hReq)
-	network.request(hReq, "PUT", networkListener, params)
-end
-
 local function putGM(path, parameters, networkListener)
 	-- PUT call to GM
 
@@ -220,7 +189,6 @@ local function putGM(path, parameters, networkListener)
 	print("\nPut Request: "..hReq)
 	network.request(hReq, "PUT", networkListener, params)
 end
-
 
 local function deleteGM(path, parameters, networkListener)
 	-- Delete call to GM
@@ -265,7 +233,6 @@ function gameminion.init(accessKey, secretKey)	-- constructor
 		authToken = authToken,
 		accessKey = GM_ACCESS_KEY,
 		secretKey = GM_SECRET_KEY,
-		cloudStorageBox = cloudStorageBox,
 		gameminion = gameminion
 	}
 	
@@ -288,6 +255,40 @@ function gameminion:loginAPI(username, password)
 	local params = "login="..username.."&password="..password
 
 	local path = "user_sessions/user_login.json"
+
+	-- set AuthToken when it gets it
+	local function networkListener(event)
+		local response = json.decode(event.response)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+
+			if (response.auth_token) then
+				self.authToken = response.auth_token
+				print("User Logged In!")
+				print("Auth Token: "..self.authToken)
+				Runtime:dispatchEvent({name="LoggedIn"})
+				return true
+			else
+				print("Login Error: "..event.response)
+				Runtime:dispatchEvent({name="LoginError", errorMsg=response.errors[1]})
+			end
+		end
+	end
+
+	postGM(path, params, networkListener)
+
+	return true
+end
+
+-------------------------------------------------
+
+function gameminion:loginFacebook(facebookID, accessToken)
+	local params = "facebook_id="..facebookID.."&access_token="..accessToken
+
+	local path = "facebook_login.json"
 
 	-- set AuthToken when it gets it
 	local function networkListener(event)
@@ -389,6 +390,8 @@ function gameminion:updateMyProfile(userName,firstName,lastName,passWord,profile
 			return false
 		else
 			print("My Profile Updated: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="MyProfileUpdated", results=response})
 		end
 	end
 
@@ -426,6 +429,8 @@ function gameminion:registerDevice(deviceToken)
 			return false
 		else
 			print("Device Registered: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="DeviceRegistered", results=response})
 		end
 	end
 
@@ -452,6 +457,32 @@ function gameminion:registerUser(firstName, lastName, username, email, password)
 			return false
 		else
 			print("User Registered: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="UserRegistered", results=response})
+		end
+	end
+
+	postGM(path, params, networkListener)
+
+end
+
+-------------------------------------------------
+
+function gameminion:recoverPassword(email)
+	local params = "email="..email
+
+	local path = "users/forgot.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Password Recovery Initiated: "..event.response)
+			local response = json.decode(event.response)
+			Runtime:dispatchEvent({name="PasswordRecovery", results=response})
 		end
 	end
 
@@ -989,9 +1020,8 @@ end
 function gameminion:createStorageBox()
 	local params = "auth_token="..self.authToken
 
-	local path = "storage.json"
+	local path = "storage.xml"
 
-	-- set cloudStorageBox when it gets it
 	local  function networkListener(event)
 		if (event.isError) then
 			print("Network Error")
@@ -1012,9 +1042,8 @@ end
 function gameminion:updateStorageBox(data)
 	local params = "auth_token="..self.authToken
 
-	local path = "storage.json"
+	local path = "storage.xml"
 
-	-- set cloudStorageBox when it gets it
 	local  function networkListener(event)
 		if (event.isError) then
 			print("Network Error")
@@ -1035,9 +1064,8 @@ end
 function gameminion:getStorageBox()
 	local params = "auth_token="..self.authToken
 
-	local path = "storage.json"
+	local path = "storage.xml"
 
-	-- set currentUser when it gets it
 	local  function networkListener(event)
 		if (event.isError) then
 			print("Network Error")
