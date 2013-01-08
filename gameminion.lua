@@ -565,8 +565,8 @@ end
 -------------------------------------------------
 
 function gameminion:getAllAchievements()
-	local params = "auth_token="..self.authToken
-
+	local params = ""
+	
 	local path = "achievements.json"
 
 	-- set currentUser when it gets it
