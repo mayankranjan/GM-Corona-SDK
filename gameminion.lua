@@ -610,10 +610,10 @@ end
 
 -------------------------------------------------
 
-function gameminion:getMyUnlockedAchievements(userID)
+function gameminion:getMyUnlockedAchievements()
 	local params = "auth_token="..self.authToken
 
-	local path = "achievements/user/"..userID..".json"
+	local path = "achievements_user.json"
 
 	-- set currentUser when it gets it
 	local  function networkListener(event)
