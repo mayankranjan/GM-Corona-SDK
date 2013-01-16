@@ -24,11 +24,11 @@ local json = require("json")
 local friendID
 
 -- Initialize Game Minion
--- Make sure you use your own Access and Secret games keys!
+-- Make sure you use your own Access and Secret games keys! This is available on the Portal - [Your Game] - General
 gm = gm.init("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
 
 -- use registerUser() before login you need to have created a user/player 
-gm:loginAPI("janedoe@mailmail.com","password")
+gm:loginAPI("email","password")
 
 --As a security measure and standard practice we return an error, but we never reveal if the credencials are incorrect or the user doesn't exist
 local function listenerLogin(event)

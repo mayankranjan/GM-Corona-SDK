@@ -1160,9 +1160,14 @@ end
 
 -------------------------------------------------
 
-function gameminion:addPlayerToMatch(userID, matchID)
+function gameminion:addPlayerToMatch(userID, matchID, userAlert)
 	local params = "auth_token="..self.authToken
 	params = params.."&user_id="..userID
+
+	if (userAlert ~= nil) then
+		params = params.."&user_alert="..userAlert
+	end 
+
 	
 	local path = "matches/"..matchID.."/add_player.json"
 
@@ -1356,9 +1361,14 @@ end
 
 -------------------------------------------------
 
-function gameminion:acceptChallenge(matchID)
+function gameminion:acceptChallenge(matchID, userAlert)
 	local params = "auth_token="..self.authToken
 	
+	if (userAlert ~= nil) then
+		params = params.."&user_alert="..userAlert
+	end 
+
+
 	local path = "matches/"..matchID.."/accept_request.json"
 
 	-- set currentUser when it gets it
@@ -1379,6 +1389,10 @@ end
 
 function gameminion:declineChallenge(matchID)
 	local params = "auth_token="..self.authToken
+
+	if (userAlert ~= nil) then
+		params = params.."&user_alert="..userAlert
+	end 
 	
 	local path = "matches/"..matchID.."/reject_request.json"
 
@@ -1398,12 +1412,16 @@ end
 
 -------------------------------------------------
 
-function gameminion:createRandomChallenge(matchID,matchType)
+function gameminion:createRandomChallenge(matchID, matchType, userAlert)
 	local params = "auth_token="..self.authToken
 	
 	if matchType ~= nil then 
 		params = params.."&match_type="..matchType
 	end
+
+	if (userAlert ~= nil) then
+		params = params.."&user_alert="..userAlert
+	end 
 
 	local path = "matches/random_match_up.json"
 
