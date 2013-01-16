@@ -1230,7 +1230,7 @@ end
 
 -------------------------------------------------
 
-function gameminion:submitMove(moveContent, targetGroup, targetUser, matchID)
+function gameminion:submitMove(moveContent, targetGroup, targetUser, matchID, userAlert)
 	local params = "auth_token="..self.authToken
 	
 	-- if targetgroup specified then add parameter
@@ -1241,6 +1241,11 @@ function gameminion:submitMove(moveContent, targetGroup, targetUser, matchID)
 	-- if targetUser specified then add parameter
 	if (targetGroup ~= nil) then
 		params = params.."&target_user_id="..targetUser
+	end
+
+	-- if userAlert specified then add parameter
+	if (userAlert ~= nil) then
+		params = params.."&user_alert="..userAlert
 	end
 
 	-- Base64 encode moveContent
@@ -1411,6 +1416,35 @@ function gameminion:createRandomChallenge(matchID,matchType)
 		else
 			print("Random Challenge Sent: "..event.response)
 			Runtime:dispatchEvent({name="Multiplayer", type="RandomChallenge", results=response})
+		end
+	end
+
+	postGM(path, params, networkListener)
+end
+
+-------------------------------------------------
+
+function gameminion:nudgeUser(matchID, userAlert, payLoad)
+	local params = "auth_token="..self.authToken
+	
+	if (userAlert ~= nil) then
+		params = params.."&user_alert="..userAlert
+	end 
+
+	if (payLoad ~= nil) then
+		params = params.."&payload="..payLoad
+	end
+
+	local path = "matches/"..matchID.."/nudge.json"
+
+	-- set currentUser when it gets it
+	local  function networkListener(event)
+		if (event.isError) then
+			print("Network Error")
+			print("Error: "..event.response)
+			return false
+		else
+			print("Send a nudge to a user: "..event.response)
 		end
 	end
 
