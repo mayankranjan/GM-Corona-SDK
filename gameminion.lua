@@ -1471,27 +1471,6 @@ end
 
 -------------------------------------------------
 
-function gameminion:createMPChannel(matchID)
-	local params = "auth_token="..self.authToken
-	
-	local path = "matches/"..matchID.."/create_channel_for_player.json"
-
-	-- set currentUser when it gets it
-	local  function networkListener(event)
-		if (event.isError) then
-			print("Network Error")
-			print("Error: "..event.response)
-			return false
-		else
-			print("MP Channel Created: "..event.response)
-		end
-	end
-
-	postGM(path, params, networkListener)
-end
-
--------------------------------------------------
-
 function gameminion:pollMP(playerID)
 	local path = "http://mp.gameminion.com/receive"
 	path = path.."?player_id="..playerID
