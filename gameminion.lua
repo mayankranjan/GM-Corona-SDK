@@ -1136,8 +1136,12 @@ end
 
 -------------------------------------------------
 
-function gameminion:resignMatch(matchID)
+function gameminion:resignMatch(matchID, userAlert)
 	local params = "auth_token="..self.authToken
+
+	if (userAlert ~= nil) then
+		params = params.."&user_alert="..userAlert
+	end 
 
 	local path = "matches/"..matchID.."/resign.json"
 
@@ -1472,7 +1476,7 @@ end
 -------------------------------------------------
 
 function gameminion:pollMP(playerID)
-	local path = "http://mp.gameminion.com/receive"
+	local path = "http://mp.gameminion.com/receive.json"
 	path = path.."?player_id="..playerID
 
 	-- set currentUser when it gets it
