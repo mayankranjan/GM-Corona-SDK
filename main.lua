@@ -27,6 +27,7 @@ local friendID
 -- Make sure you use your own Access and Secret games keys!
 gm = gm.init("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
 
+-- use registerUser() before login you need to have created a user/player 
 gm:loginAPI("janedoe@mailmail.com","password")
 
 --As a security measure and standard practice we return an error, but we never reveal if the credencials are incorrect or the user doesn't exist
